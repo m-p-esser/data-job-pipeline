@@ -51,6 +51,10 @@ pipeline/request:
 	@echo "Requesting API data..."
 	python src/request_google_jobs.py
 
+pipeline/split:
+	@echo "Splitting GCS File into multiple ones..."
+	python src/split_gcs_files.py
+
 pipeline:
 	@echo "Running full pipeline..."
 	python src/main.py
