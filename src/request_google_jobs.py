@@ -3,9 +3,8 @@
 import requests
 from prefect import flow, get_run_logger, task
 
-from etl import persist, request, process
+from etl import persist, request
 from utils.config import GoogleJobsAPIRequestConfig
-from utils.data_models import BigQuerySchema
 
 
 @task(
@@ -51,53 +50,26 @@ def parse_google_jobs_endpoint_response(
 
 @task
 def save_google_jobs_endpoint_result(
-    response_dict: dict, save_dir: str, file_name: str, save_location: str
+    response_dict: dict, save_dir: str, file_name: str, extension: str, save_location: str
 ) -> None:
     """Save the result from the Google Jobs API Endpoint (Serpapi)"""
 
     logger = get_run_logger()
 
-    persist.save_result_as_file(response_dict, save_dir, file_name, save_location)
+    # Define the Path where the file will be saved
+    if response_dict["search_metadata"]["status"] == "Success":
+        save_dir = f"{save_dir}/successful/"
+
+    if response_dict["search_metadata"]["status"] == "Error":
+        save_dir = f"{save_dir}/error/"
+
+    file_name_with_suffix = file_name + "_" + response_dict["search_metadata"]["id"]
+
+    persist.save_result_as_file(response_dict, save_dir, file_name_with_suffix, extension, save_location)
 
     logger.info("INFO level log message")
-    logger.info(f"Saved API response here: {save_dir}/{file_name} | ({save_location})")
+    logger.info(f"Saved API response here: {save_dir}/{file_name_with_suffix} | ({save_location})")
 
-
-# @task
-# def write_google_jobs_endpoint_result_to_bigquery(
-#     response_dict: dict, dataset_id: str, table_name: str
-# ) -> None:
-#     """Write the result from the Google Jobs API Endpoint (Serpapi) to BigQuery"""
-
-#     logger = get_run_logger()
-#     logger.info("INFO level log message")
-
-#     # Prepare rows for BigQuery
-#     # prepared_data = process.prepare_data_for_bigquery(response_dict)
-#     # rows = []
-#     # rows.append(prepared_data)
-
-#     rows = [{
-#         "search_metadata": {
-#             "id": "64201eb234ff954f9eb2f476",
-#             "status": "Success"
-#         },
-#         "search_parameters": {
-#             "q": "Data Analyst",
-#             "engine": "google_jobs"
-#         },
-#         "job_results": {
-#             "title": "Data Analyst (m/w/d)",
-#             "company_name": "F mal s GmbH",
-#         }
-#         }]
-
-#     logger.info(f"The following rows will be written to table: {rows}")
-
-#     # Write to BigQuery
-#     persist.write_to_bigquery_table(dataset_id, table_name, rows)
-
-#     logger.info(f"Inserted rows to table: {dataset_id}.{table_name}")
 
 @flow
 def google_jobs_endpoint_request_flow(
@@ -110,11 +82,8 @@ def google_jobs_endpoint_request_flow(
     result = parse_google_jobs_endpoint_response(response)
 
     save_google_jobs_endpoint_result(
-        result, config.save_dir, config.file_name, config.save_location
+        result, config.save_dir, config.file_name, config.extension, config.save_location
     )
-
-    # write_google_jobs_endpoint_result_to_bigquery(result, config.dataset_id, config.table_name)
-
 
 if __name__ == "__main__":
     google_jobs_endpoint_request_flow(
