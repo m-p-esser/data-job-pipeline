@@ -1,8 +1,8 @@
 """Python module related to persist data"""
 
 import json
+import time
 
-from prefect_gcp.bigquery import bigquery_load_cloud_storage
 from prefect_gcp.credentials import GcpCredentials
 from google.cloud import storage
 from google.cloud import bigquery
@@ -40,7 +40,7 @@ def save_result_as_file(
     # Write to location depending on save_location
     if save_location == "local":
         with open(save_path, "w") as f:
-            json.dump(response_dict, f, indent=4)
+            json.dump(response_dict, f, indent=None)
 
     if save_location == "gcs":
 
@@ -55,70 +55,55 @@ def save_result_as_file(
         # Upload to GCS
         blob = gcs_bucket.blob(save_path)
         blob.upload_from_string(
-            data=json.dumps(response_dict), 
+            data=json.dumps(response_dict, indent=None), 
             content_type="application/json"
             )
 
 
+def write_gcs_json_to_bigquery_table(load_dir: str, file_name: str, dataset_id: str, table_id: str) #, schema: list[bigquery.SchemaField]):
 
+    """Load a JSON file stored in GCS and write it to a BigQuery table
 
-# def write_to_bigquery_table(
-#     dataset_id: str, table_name: str, row_to_insert: dict
-# ):
-#     """
-#     Creates a BigQuery Table.
+    Parameters
+    ----------
+    load_dir : str
+        The directory to load the file from
+    file_name : str
+        The name of the file to load
+    extension : str
+        The extension of the file
+    load_location : str, optional
+        The location to load the file from, by default "local"
+    dataset_id : str
+        The BigQuery dataset to write to
+    table_id : str
+        The BigQuery table to write to
+    schema : list[bigquery.SchemaField]
+        The schema of the BigQuery table
+    """
 
-#     Args:
-#         dataset_id: Dataset ID of the table where data should be written to.
-#         table_name: The name of the table where data should be written to.
-#         rows_to_insert: The rows to insert into the table.
-#     """
-#     # Load Credentials and Config
-#     gcp_credentials = GcpCredentials.load("gcp-credentials")
+    # Load Credentials and Config
+    gcp_credentials = GcpCredentials.load("gcp-credentials")
 
-#     # Init Client
-#     client = bigquery.Client(project=gcp_credentials.project)
+    # Init Client
+    client = bigquery.Client(project=gcp_credentials.project)
 
-#     # Get Table instance
-#     table_ref = f"{dataset_id}.{table_name}"
-#     table = client.get_table(table_ref)
+    # Construct Table reference
+    table_id = f"{dataset_id}.{table_id}"
 
-#     # Insert Row
-#     client.insert_rows(table, row_to_insert)
+    job_config = bigquery.LoadJobConfig(
+        autodetect=True,
+        # schema=schema,
+        source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
+        write_disposition="WRITE_APPEND"
+    )
 
+    # Construct URI
+    uri = f"gs://serpapi_jobs/{load_dir}/{file_name}.json"
+    job = client.load_table_from_uri(uri, table_id, job_config=job_config)
 
-
-# def transfer_data_from_gcs_to_bigquery(
-#     dataset_id: str, table_name: str, gcs_uri: str
-# ):
-#     """Load data from file stored in Google Cloud Storage (GCS) and store it in Google BigQuery Table
-
-#     Parameters
-#     ----------
-#     dataset_id : str
-#         The name of the dataset
-#     table_name : str
-#         The name of the table
-#     gcs_uri : str
-#         The URI of the file in GCS
-#     """
-
-#     logger = get_run_logger()
-
-#     # Load GCP credentials from the context
-#     gcp_credentials = GcpCredentials.load("gcp-credentials")
-
-#     # Load data from GCS to BigQuery
-#     result = bigquery_load_cloud_storage(
-#         dataset=dataset_id,
-#         table=table_name,
-#         uri=gcs_uri,
-#         gcp_credentials=gcp_credentials,
-#     )
-
-#     logger.info("INFO level log message")
-#     logger.info(
-#         f"Inserted API response to BigQuery here: {dataset_id}.{table_name}"
-#     )
-
-#     return result
+    # Wait for the job to complete.
+    while job.state != "DONE":
+        job.reload()
+        time.sleep(2)
+    print(job.result())
