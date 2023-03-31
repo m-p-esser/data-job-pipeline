@@ -33,6 +33,11 @@ class GCSFileSplittingConfig(BaseModel):
     load_dir: str = "data/raw/successful"
     save_dir: str = "data/processed"
 
+class GCSToBigQueryConfig(BaseModel):
+    """Configuration for storing GCS Files into Bigquery"""
+
+    load_dir: str = "data/processed"
+    dataset_id: str = "raw"  # BigQuery Dataset ID
 
 class GoogleJobsAPIQueryCombinations(BaseModel):
     """Search Queries for requesting the Google Jobs API endpoint from Serpapi"""
