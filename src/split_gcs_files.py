@@ -34,12 +34,12 @@ def split_gcs_file_into_individual_files(load_dir: str, file_name: str, extensio
     data = json.loads(bytes.decode('utf-8'))
 
     # Split data into different dicts
-    metadata = data["search_metadata"]
+    search_metadata = data["search_metadata"]
     search_parameters = data["search_parameters"]
     job_results = data["jobs_results"]
 
     # Combine different Dicts in a single Dict
-    splitted_data = {'metadata': metadata, 'search_parameters': search_parameters, 'job_results': job_results}
+    splitted_data = {'search_metadata': search_metadata, 'search_parameters': search_parameters, 'job_results': job_results}
 
     logger.info("INFO level log message")
     logger.info(f"Split GCS file into {len(splitted_data.keys())} individual files")
@@ -68,12 +68,12 @@ def save_splitted_files_in_gcs(
 
     logger = get_run_logger()
 
-    id = splitted_data["metadata"]["id"] # search id
+    search_id = splitted_data["search_metadata"]["id"]
 
     for k, v in splitted_data.items():
 
         # Store individual dicts as file in GCS
-        file_name_with_suffix = f"{k}_{id}"
+        file_name_with_suffix = f"{k}_{search_id}"
         persist.save_result_as_file(v, save_dir, file_name_with_suffix, extension, save_location)
 
         logger.info("INFO level log message")
