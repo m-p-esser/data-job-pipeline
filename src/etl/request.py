@@ -1,7 +1,6 @@
 """Python module related to requesting data from APIs"""
 
 import requests
-from serpapi import GoogleSearch
 
 
 def request_serpapi(params: dict) -> requests.Response:
