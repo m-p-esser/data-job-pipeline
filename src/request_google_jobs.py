@@ -58,10 +58,10 @@ def save_google_jobs_endpoint_result(
 
     # Define the Path where the file will be saved
     if response_dict["search_metadata"]["status"] == "Success":
-        save_dir = f"{save_dir}/successful/"
+        save_dir = f"{save_dir}/successful"
 
     if response_dict["search_metadata"]["status"] == "Error":
-        save_dir = f"{save_dir}/error/"
+        save_dir = f"{save_dir}/error"
 
     file_name_with_suffix = file_name + "_" + response_dict["search_metadata"]["id"]
 
