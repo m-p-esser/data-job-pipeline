@@ -27,6 +27,13 @@ class GoogleJobsAPIRequestConfig(BaseModel):
     dataset_id: str = "raw"  # BigQuery Dataset ID
     table_name: str = "google_jobs"  # BigQuery Table Name
 
+class GCSFileSplittingConfig(BaseModel):
+    """Configuration for splitting Raw GCS Files into seperate Files """
+
+    load_dir: str = "data/raw/successful"
+    save_dir: str = "data/processed"
+
+
 class GoogleJobsAPIQueryCombinations(BaseModel):
     """Search Queries for requesting the Google Jobs API endpoint from Serpapi"""
 
