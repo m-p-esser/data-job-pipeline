@@ -55,6 +55,10 @@ pipeline/split:
 	@echo "Splitting GCS File into multiple ones..."
 	python src/split_gcs_files.py
 
+pipeline/gcs_to_bq:
+	@echo "Loading GCS files into Bigquery..."
+	python src/gcs_to_bigquery.py
+
 pipeline:
 	@echo "Running full pipeline..."
 	python src/main.py
