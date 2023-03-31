@@ -60,7 +60,7 @@ def save_result_as_file(
             )
 
 
-def write_gcs_json_to_bigquery_table(load_dir: str, file_name: str, dataset_id: str, table_id: str) #, schema: list[bigquery.SchemaField]):
+def write_gcs_json_to_bigquery_table(load_dir: str, file_name: str, dataset_id: str, table_id: str): #, schema: list[bigquery.SchemaField]):
 
     """Load a JSON file stored in GCS and write it to a BigQuery table
 
