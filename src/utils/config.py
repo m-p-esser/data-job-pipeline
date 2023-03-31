@@ -22,6 +22,7 @@ class GoogleJobsAPIRequestConfig(BaseModel):
     params: dict = dict(GoogleJobsAPIRequestParams())
     save_dir: str = "data/raw"
     file_name: str = "google_jobs"
+    extension: str = "json"
     save_location: str = "gcs"
     dataset_id: str = "raw"  # BigQuery Dataset ID
     table_name: str = "google_jobs"  # BigQuery Table Name
