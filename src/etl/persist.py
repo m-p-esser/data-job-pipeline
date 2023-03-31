@@ -9,38 +9,33 @@ from google.cloud import bigquery
 
 
 def save_result_as_file(
-    response_dict: dict, save_dir: str, file_name: str, save_location: str = "local"
+    response_dict: dict, save_dir: str, file_name: str, extension: str, save_location: str = "local"
 ):
     """Save the response_dict to a file
 
     Parameters
     ----------
     response_dict : dict
-        The response_json to save
+        The response_dict to save
     save_dir : str
-        The directory to save the response_dict
+        The directory to save the file to
+    file_name : str
+        The name of the file to save
+    extension : str
+        The extension of the file
     save_location : str, optional
-        The location to store the response_dict, by default "local"
+        The location to store the file, by default "local"
     """
 
     allowed_save_locations = ["local", "gcs"]
     if save_location not in allowed_save_locations:
         raise ValueError(
-            "save_location must be one of the following values: {}".format(
-                allowed_save_locations
-            )
+            f"save_location must be one of the following values: {allowed_save_locations}. \n Instead got: '{save_location}'"
         )
 
-    # Construct the file name
-    file_name_with_suffix = file_name + "_" + response_dict["search_metadata"]["id"]
-    file_name_with_suffix_and_extension = file_name_with_suffix + ".json"
-
-    # Define the Path where the file will be saved
-    if response_dict["search_metadata"]["status"] == "Success":
-        save_path = f"{save_dir}/successful/{file_name_with_suffix_and_extension}"
-
-    if response_dict["search_metadata"]["status"] == "Error":
-        save_path = f"{save_dir}/error/{file_name_with_suffix_and_extension}"
+    # Construct the save file path
+    file_name_with_suffix_and_extension = f"{file_name}.{extension}"
+    save_path = f"{save_dir}/{file_name_with_suffix_and_extension}"
 
     # Write to location depending on save_location
     if save_location == "local":
@@ -64,29 +59,32 @@ def save_result_as_file(
             content_type="application/json"
             )
 
-def write_to_bigquery_table(
-    dataset_id: str, table_name: str, row_to_insert: dict
-):
-    """
-    Creates a BigQuery Table.
 
-    Args:
-        dataset_id: Dataset ID of the table where data should be written to.
-        table_name: The name of the table where data should be written to.
-        rows_to_insert: The rows to insert into the table.
-    """
-    # Load Credentials and Config
-    gcp_credentials = GcpCredentials.load("gcp-credentials")
 
-    # Init Client
-    client = bigquery.Client(project=gcp_credentials.project)
 
-    # Get Table instance
-    table_ref = f"{dataset_id}.{table_name}"
-    table = client.get_table(table_ref)
+# def write_to_bigquery_table(
+#     dataset_id: str, table_name: str, row_to_insert: dict
+# ):
+#     """
+#     Creates a BigQuery Table.
 
-    # Insert Row
-    client.insert_rows(table, row_to_insert)
+#     Args:
+#         dataset_id: Dataset ID of the table where data should be written to.
+#         table_name: The name of the table where data should be written to.
+#         rows_to_insert: The rows to insert into the table.
+#     """
+#     # Load Credentials and Config
+#     gcp_credentials = GcpCredentials.load("gcp-credentials")
+
+#     # Init Client
+#     client = bigquery.Client(project=gcp_credentials.project)
+
+#     # Get Table instance
+#     table_ref = f"{dataset_id}.{table_name}"
+#     table = client.get_table(table_ref)
+
+#     # Insert Row
+#     client.insert_rows(table, row_to_insert)
 
 
 
