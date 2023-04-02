@@ -2,6 +2,7 @@
 
 from pydantic import BaseModel
 from prefect.blocks.system import Secret
+import itertools
 
 class GoogleJobsAPIRequestParams(BaseModel):
     """Parameters for requesting the Google Jobs API endpoint from Serpapi"""
@@ -51,25 +52,41 @@ class GoogleJobsAPIQueryCombinations(BaseModel):
         "Dusseldorf,North Rhine-Westphalia,Germany",
         
         # Other Cities / regions in North Rhine-Westphalia 
-        "Essen,North Rhine-Westphalia,Germany",
-        "Dortmund,North Rhine-Westphalia,Germany",
-        "Duisburg,North Rhine-Westphalia,Germany",
-        "Bielfeld,North Rhine-Westphalia,Germany",
+        # "Essen,North Rhine-Westphalia,Germany",
+        # "Dortmund,North Rhine-Westphalia,Germany",
+        # "Duisburg,North Rhine-Westphalia,Germany",
+        # "Bielfeld,North Rhine-Westphalia,Germany",
 
-        # Other big cities in Germany
-        "Berlin,Germany",
-        "Hamburg,Germany",
-        "Munich,Bavaria,Germany",
-        "Frankfurt,Hesse,Germany",
-        "Stuttgart,Baden-Wurttemberg,Germany",
-        "Leipzig,Saxony,Germany",
-        "Bremen,Bremen,Germany",
-        "Dresden,Saxony,Germany",
-        "Hannover,Lower Saxony,Germany",
-        "Nuremberg,Bavaria,Germany",
-        "Bochum,North Rhine-Westphalia,Germany",
-        "Wuppertal,North Rhine-Westphalia,Germany",
-        "Munster,North Rhine-Westphalia,Germany"
-        ]
-    start_offset: list[int] = 0, 10, 20 # Top 30 Results
+        # # Other big cities in Germany
+        # "Berlin,Germany",
+        # "Hamburg,Germany",
+        # "Munich,Bavaria,Germany",
+        # "Frankfurt,Hesse,Germany",
+        # "Stuttgart,Baden-Wurttemberg,Germany",
+        # "Leipzig,Saxony,Germany",
+        # "Bremen,Bremen,Germany",
+        # "Dresden,Saxony,Germany",
+        # "Hannover,Lower Saxony,Germany",
+        # "Nuremberg,Bavaria,Germany",
+        # "Bochum,North Rhine-Westphalia,Germany",
+        # "Wuppertal,North Rhine-Westphalia,Germany",
+        # "Munster,North Rhine-Westphalia,Germany"
+    ]
+    start_offsets: list[int] = [0] #, 10] #, 20] # Top 30 Results
 
+def create_permutations(jobs: list, locations: list, start_offsets: list) -> list[tuple]:
+    """Create all possible combinations of the given parameters"""
+
+    list_of_lists = [jobs, locations, start_offsets]
+    permutations = list(itertools.product(*list_of_lists))
+    return permutations
+
+
+# api_query_combinations = GoogleJobsAPIQueryCombinations()
+# # temp = [api_query_combinations.jobs, api_query_combinations.locations, api_query_combinations.start_offset]
+
+# # print(temp)
+
+# permutations = create_permutations(api_query_combinations.jobs, api_query_combinations.locations, api_query_combinations.start_offsets)
+# print(len(permutations))
+# print(permutations)
