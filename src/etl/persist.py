@@ -94,7 +94,7 @@ def write_gcs_json_to_bigquery_table(load_dir: str, file_name: str, dataset_id: 
     client = bigquery.Client(project=gcp_credentials.project)
 
     # Construct Table reference
-    table_id = f"{dataset_id}.{table_id}"
+    table_ref = f"{dataset_id}.{table_id}"
 
     job_config = bigquery.LoadJobConfig(
         autodetect=autodetect,
@@ -105,7 +105,7 @@ def write_gcs_json_to_bigquery_table(load_dir: str, file_name: str, dataset_id: 
 
     # Construct URI
     uri = f"gs://serpapi_jobs/{load_dir}/{file_name}.json"
-    job = client.load_table_from_uri(uri, table_id, job_config=job_config)
+    job = client.load_table_from_uri(uri, table_ref, job_config=job_config)
 
     # Wait for the job to complete.
     while job.state != "DONE":
