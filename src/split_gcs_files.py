@@ -4,9 +4,34 @@ import json
 
 from prefect import flow, get_run_logger, task
 import pandas as pd
+from prefect_gcp.credentials import GcpCredentials
+from google.cloud import storage
 
 from etl import load, persist
 from utils.config import GCSFileSplittingConfig
+
+@task
+def get_unprocessed_search_ids(load_dir: str, save_dir: str) -> list:
+
+    # Load Credentials and Config
+    gcp_credentials = GcpCredentials.load("gcp-credentials")
+    project_id = gcp_credentials.project
+
+    # Init Client
+    client = storage.Client(project=project_id)
+
+    # Get Search IDs of raw files (which might or might not have been split yet)
+    raw_blobs = client.list_blobs("serpapi_jobs", prefix=load_dir)
+    raw_search_ids = [b.name.split("_")[-1].split(".")[0] for b in raw_blobs if b.name != f"{load_dir}/"]
+
+    # Get Search IDs of processed files (which have already been split)
+    processed_blobs = client.list_blobs("serpapi_jobs", prefix=save_dir)
+    processed_search_ids = [b.name.split("_")[-1].split(".")[0] for b in processed_blobs if b.name != f"{save_dir}"]
+
+    # Find all Search IDs that have not been processed yet (= files that have not been split yet)
+    unprocessed_search_ids = list(set(raw_search_ids).difference(set(processed_search_ids)))
+
+    return unprocessed_search_ids
 
 
 @task
@@ -100,9 +125,14 @@ def split_gcs_files_flow(
 ):
     """Flow to request the Domain Summary Serpstat API endpoint and store the results"""
 
-    splitted_data = split_gcs_file_into_individual_files(config.load_dir, "google_jobs_64272d609c84ac2f3119a48e")
+    unprocessed_search_ids = get_unprocessed_search_ids(config.load_dir, config.save_dir)
 
-    save_splitted_files_in_gcs(splitted_data, config.save_dir)
+    for search_id in unprocessed_search_ids:
+        file_name = f"google_jobs_{search_id}"
+
+        splitted_data = split_gcs_file_into_individual_files(config.load_dir, file_name)
+
+        save_splitted_files_in_gcs(splitted_data, config.save_dir)
 
 if __name__ == "__main__":
     split_gcs_files_flow(
