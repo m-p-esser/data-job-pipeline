@@ -72,7 +72,7 @@ class GoogleJobsAPIQueryCombinations(BaseModel):
         # "Wuppertal,North Rhine-Westphalia,Germany",
         # "Munster,North Rhine-Westphalia,Germany"
     ]
-    start_offsets: list[int] = [0] #, 10] #, 20] # Top 30 Results
+    start_offsets: list[int] = [0, 10, 20] # Top 30 Results
 
 def create_permutations(jobs: list, locations: list, start_offsets: list) -> list[tuple]:
     """Create all possible combinations of the given parameters"""
