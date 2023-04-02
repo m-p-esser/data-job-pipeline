@@ -80,13 +80,3 @@ def create_permutations(jobs: list, locations: list, start_offsets: list) -> lis
     list_of_lists = [jobs, locations, start_offsets]
     permutations = list(itertools.product(*list_of_lists))
     return permutations
-
-
-# api_query_combinations = GoogleJobsAPIQueryCombinations()
-# # temp = [api_query_combinations.jobs, api_query_combinations.locations, api_query_combinations.start_offset]
-
-# # print(temp)
-
-# permutations = create_permutations(api_query_combinations.jobs, api_query_combinations.locations, api_query_combinations.start_offsets)
-# print(len(permutations))
-# print(permutations)
