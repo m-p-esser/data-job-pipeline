@@ -4,7 +4,7 @@ import requests
 from prefect import flow, get_run_logger, task
 
 from etl import persist, request
-from utils.config import GoogleJobsAPIRequestConfig
+from utils.config import GoogleJobsAPIRequestConfig, GoogleJobsAPIQueryCombinations, create_permutations
 
 
 @task(
@@ -73,19 +73,31 @@ def save_google_jobs_endpoint_result(
 
 @flow
 def google_jobs_endpoint_request_flow(
-    config: GoogleJobsAPIRequestConfig
+    request_config: GoogleJobsAPIRequestConfig,
+    combinations_config: GoogleJobsAPIQueryCombinations,
 ):
     """Flow to request the Domain Summary Serpstat API endpoint and store the results"""
 
-    response = request_google_jobs_endpoint(config.params)
+    # Create all possible combinations of the parameters
+    permutations = create_permutations(combinations_config.jobs, combinations_config.locations, combinations_config.start_offsets)
 
-    result = parse_google_jobs_endpoint_response(response)
+    # Request the API Endpoint for each combination of parameters
+    for i in permutations:
+        (q, location, start) = i
+        request_config.params.update({"q": q})
+        request_config.params.update({"location": location})
+        request_config.params.update({"start": start})
 
-    save_google_jobs_endpoint_result(
-        result, config.save_dir, config.file_name, config.extension, config.save_location
-    )
+        response = request_google_jobs_endpoint(request_config.params)
+
+        result = parse_google_jobs_endpoint_response(response)
+
+        save_google_jobs_endpoint_result(
+            result, request_config.save_dir, request_config.file_name, request_config.extension, request_config.save_location
+        )
 
 if __name__ == "__main__":
     google_jobs_endpoint_request_flow(
-        config=GoogleJobsAPIRequestConfig(),
+        request_config=GoogleJobsAPIRequestConfig(),
+        combinations_config=GoogleJobsAPIQueryCombinations()
     )
