@@ -13,6 +13,8 @@ from utils.config import GCSFileSplittingConfig
 @task
 def get_unprocessed_search_ids(load_dir: str, save_dir: str) -> list:
 
+    logger = get_run_logger()
+
     # Load Credentials and Config
     gcp_credentials = GcpCredentials.load("gcp-credentials")
     project_id = gcp_credentials.project
@@ -30,6 +32,9 @@ def get_unprocessed_search_ids(load_dir: str, save_dir: str) -> list:
 
     # Find all Search IDs that have not been processed yet (= files that have not been split yet)
     unprocessed_search_ids = list(set(raw_search_ids).difference(set(processed_search_ids)))
+
+    logger.info("INFO level log message")
+    logger.info(f"There are {len(unprocessed_search_ids)} raw files which have not been split into multiple files yet")
 
     return unprocessed_search_ids
 
@@ -107,6 +112,7 @@ def save_splitted_files_in_gcs(
         if k == "job_results":
             for i in v:
                 i.update({"search_id": search_id})
+                i.pop("detected_extensions", None)
 
             # Convert to JSON New line delimited format
             data = pd.DataFrame(v).to_json(orient="records",lines=True)
