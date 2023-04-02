@@ -3,6 +3,7 @@
 import json
 
 from prefect import flow, get_run_logger, task
+import pandas as pd
 
 from etl import load, persist
 from utils.config import GCSFileSplittingConfig
@@ -74,7 +75,20 @@ def save_splitted_files_in_gcs(
 
         # Store individual dicts as file in GCS
         file_name_with_suffix = f"{k}_{search_id}"
-        persist.save_result_as_file(v, save_dir, file_name_with_suffix, extension, save_location)
+
+        if k == "search_parameters":
+            v.update({"search_id": search_id})
+
+        if k == "job_results":
+            for i in v:
+                i.update({"search_id": search_id})
+
+            # Convert to JSON New line delimited format
+            data = pd.DataFrame(v).to_json(orient="records",lines=True)
+            persist.save_result_as_file(data, save_dir, file_name_with_suffix, extension, save_location, indent=None)
+            
+        if k != "job_results":
+            persist.save_result_as_file(v, save_dir, file_name_with_suffix, extension, save_location, indent=None)
 
         logger.info("INFO level log message")
         logger.info(f"Saved File here: {save_dir}/{file_name_with_suffix} | ({save_location})")
