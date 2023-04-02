@@ -6,17 +6,17 @@ import time
 from prefect_gcp.credentials import GcpCredentials
 from google.cloud import storage
 from google.cloud import bigquery
-
+from typing import Union
 
 def save_result_as_file(
-    response_dict: dict, save_dir: str, file_name: str, extension: str, save_location: str = "local"
+    data: Union[dict, str], save_dir: str, file_name: str, extension: str, save_location: str = "local", indent: int = None
 ):
-    """Save the response_dict to a file
+    """Save the data
 
     Parameters
     ----------
-    response_dict : dict
-        The response_dict to save
+    data : Union[dict, str]
+        The data to save
     save_dir : str
         The directory to save the file to
     file_name : str
@@ -25,6 +25,8 @@ def save_result_as_file(
         The extension of the file
     save_location : str, optional
         The location to store the file, by default "local"
+    indent : int, optional
+        The indentation of the JSON file, by default None
     """
 
     allowed_save_locations = ["local", "gcs"]
@@ -37,10 +39,10 @@ def save_result_as_file(
     file_name_with_suffix_and_extension = f"{file_name}.{extension}"
     save_path = f"{save_dir}/{file_name_with_suffix_and_extension}"
 
-    # Write to location depending on save_location
     if save_location == "local":
+
         with open(save_path, "w") as f:
-            json.dump(response_dict, f, indent=None)
+            json.dump(obj=data, fp=f, indent=indent)
 
     if save_location == "gcs":
 
@@ -51,14 +53,17 @@ def save_result_as_file(
         # Init Client
         client = storage.Client(project=project_id)
         gcs_bucket = client.get_bucket("serpapi_jobs")
+        blob = gcs_bucket.blob(save_path)
+
+        # Prepare data for upload if it is a dict
+        if isinstance(data, dict):
+            data = json.dumps(obj=data, indent=indent)
 
         # Upload to GCS
-        blob = gcs_bucket.blob(save_path)
         blob.upload_from_string(
-            data=json.dumps(response_dict, indent=None), 
+            data=data, 
             content_type="application/json"
-            )
-
+            )     
 
 def write_gcs_json_to_bigquery_table(load_dir: str, file_name: str, dataset_id: str, table_id: str): #, schema: list[bigquery.SchemaField]):
 
