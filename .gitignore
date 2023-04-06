@@ -98,3 +98,8 @@ models/*
 
 # Hydra
 outputs/*
+
+# Prefect
+deployments
+deployments/*
+.prefectignore
