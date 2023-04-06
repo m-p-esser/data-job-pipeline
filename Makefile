@@ -59,10 +59,23 @@ pipeline/gcs_to_bq:
 	@echo "Loading GCS files into Bigquery..."
 	python src/gcs_to_bigquery.py
 
+pipeline/final_bq:
+	@echo "Creating final Bigquery Tables..."
+	python src/load_final_bigquery_tables.py
+
 pipeline:
 	@echo "Running full pipeline..."
-	python src/main.py
+	python src/request_google_jobs.py
+	python src/split_gcs_files.py
+	python src/gcs_to_bigquery.py
 
+##################### Deployment
+
+deployment:
+	poetry export -o "requirements.txt" --without-hashes --without-urls
+	docker build -t europe-west3-docker.pkg.dev/ecommerce-web-analysis/data-job-pipeline/my-image:2.7.6-python3.9 .
+	docker push europe-west3-docker.pkg.dev/ecommerce-web-analysis/data-job-pipeline/my-image:2.7.6-python3.9
+	prefect deployment build -n "Split GCS File into multiple" -sb gcs/data-job-pipeline -ib cloud-run-job/data-job-instance src/split_gcs_files.py:split_gcs_files_flow -q default -a -o "deployments/split_gcs_files_deployment.yaml"
 
 ##################### Documentation
 
