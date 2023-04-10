@@ -188,11 +188,17 @@ class KeywordExtractionConfig(BaseModel):
         "Perforce",
         "CVS",
     ]
+    datawarehousing: list[str] = [
+        "Snowflake",
+        "Redshift",
+        "BigQuery",
+        "Databricks",
+    ]
 
 
 class RegexConfig(BaseModel):
     """ Collection of Regex Patterns """
 
-    extension_regex: re.Pattern = re.compile(
+    day_hour_regex: re.Pattern = re.compile(
         r"vor\s+(\d+)\s+(Stunden|Tagen)"
     )  # to identify extension in job description
