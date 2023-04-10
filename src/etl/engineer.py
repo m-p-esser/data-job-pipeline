@@ -26,9 +26,6 @@ def extract_keywords(keywords: list[str], text: str) -> list[str]:
     return matches
 
 
-pattern = re.compile(r"vor\s+(\d+)\s+(Stunden|Tagen)")
-
-
 def identify_extension_type(value, pattern) -> str:
     """Identify extension type based on value
 
@@ -40,7 +37,7 @@ def identify_extension_type(value, pattern) -> str:
           Regex Pattern to identify extension type from
     """
 
-    if value in ["Vollzeit", "Teilzeit", "Praktikum", "Freiw. Altersvorsorge"]:
+    if value in ["Vollzeit", "Teilzeit", "Praktikum"]:
         return "employment_type"
     elif isinstance(re.search(pattern, value), re.Match):
         return "posted_n_periods_ago"
