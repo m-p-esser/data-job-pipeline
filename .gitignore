@@ -103,3 +103,7 @@ outputs/*
 deployments
 deployments/*
 .prefectignore
+
+# Jupyter
+.ipynb_checkpoints
+notebooks
