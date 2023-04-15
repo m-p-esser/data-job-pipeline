@@ -2,6 +2,7 @@
 
 import json
 import re
+import time
 
 import pandas as pd
 from google.cloud import bigquery
@@ -96,11 +97,12 @@ def extract_text_length_from_job_descriptions(
 
 
 @task
-def extract_htidocid(df: pd.DataFrame) -> pd.DataFrame:
+def extract_features_from_job_id(df: pd.DataFrame) -> pd.DataFrame:
 
     logger = get_run_logger()
 
     df["htidocid"] = df["job_id"].apply(lambda x: json.loads(x)["htidocid"])
+    df["job_title"] = df["job_id"].apply(lambda x: json.loads(x)["job_title"])
 
     logger.info("INFO level log message")
     logger.info(f"There are {df['job_id'].nunique()} unique Job IDs")
@@ -134,6 +136,7 @@ def deduplicate_job_results(df: pd.DataFrame) -> pd.DataFrame:
         f"Deduplicated Job Results Dataframe with Shape: '{df.shape}' from Bigquery"
     )
     logger.info(f"Number of Duplicates: '{number_duplicates}'")
+    logger.info(f"Columns: '{df.columns}'")
 
     return df
 
@@ -170,6 +173,7 @@ def identify_extension_type_from_extensions(
     logger.info(
         f"Created Extension (Type) Dataframe with Shape: '{df.shape}' from Bigquery"
     )
+    logger.info(f"Columns: '{df.columns}'")
 
     return df
 
@@ -179,6 +183,8 @@ def calculate_posting_date(
     df: pd.DataFrame, pattern: re.Match
 ) -> pd.DataFrame:
     """ Calculate the day the Job was posted """
+
+    logger = get_run_logger()
 
     # Extract Number and Unit of Time Period (e.g. 3 and Tage)
     df[["posted_n_periods_ago_number", "posted_n_periods_ago_unit"]] = df[
@@ -209,6 +215,12 @@ def calculate_posting_date(
         df["posted_n_periods_ago_in_hours"], unit="h"
     )
 
+    logger.info("INFO level log message")
+    logger.info(
+        f"Created Posting Date Dataframe with Shape: '{df.shape}' from Bigquery"
+    )
+    logger.info(f"Columns: '{df.columns}'")
+
     return df
 
 
@@ -224,10 +236,97 @@ def construct_other_features(df: pd.DataFrame) -> pd.DataFrame:
 
     logger.info("INFO level log message")
     logger.info(
-        f"Created Extension (Type) Dataframe with Shape: '{df.shape}' from Bigquery"
+        f"Created Other Features Dataframe with Shape: '{df.shape}' from Bigquery"
     )
+    logger.info(f"Columns: '{df.columns}'")
 
     return df
+
+
+@task
+def create_final_bigquery_table(
+    client: bigquery.Client,
+    gcp_credentials: GcpCredentials,
+    keyword_columns: list[str],
+) -> bigquery.table.Table:
+    """Create Final Bigquery Table
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Dataframe with all features
+    gcp_credentials : GcpCredentials
+        GCP Credentials
+    keyword_columns : list[str]
+        List of columns that contain keywords
+
+    """
+
+    logger = get_run_logger()
+
+    schema = [
+        bigquery.SchemaField(
+            name="search_id", field_type="STRING", mode="REQUIRED"
+        ),
+        bigquery.SchemaField(name="via", field_type="STRING", mode="REQUIRED"),
+        bigquery.SchemaField(
+            name="location", field_type="STRING", mode="REQUIRED"
+        ),
+        bigquery.SchemaField(
+            name="description", field_type="STRING", mode="REQUIRED"
+        ),
+        bigquery.SchemaField(
+            name="company_name", field_type="STRING", mode="REQUIRED"
+        ),
+        bigquery.SchemaField(
+            name="title", field_type="STRING", mode="REQUIRED"
+        ),
+        bigquery.SchemaField(
+            name="created_at", field_type="STRING", mode="REQUIRED"
+        ),
+        bigquery.SchemaField(name="q", field_type="STRING", mode="REQUIRED"),
+        bigquery.SchemaField(
+            name="htidocid", field_type="STRING", mode="REQUIRED"
+        ),
+        bigquery.SchemaField(
+            name="job_title", field_type="STRING", mode="REQUIRED"
+        ),
+        bigquery.SchemaField(
+            name="text_length_in_chars", field_type="STRING", mode="REQUIRED"
+        ),
+        bigquery.SchemaField(
+            name="number_tokens", field_type="STRING", mode="REQUIRED"
+        ),
+        bigquery.SchemaField(
+            name="employment_type", field_type="STRING", mode="REQUIRED"
+        ),
+        bigquery.SchemaField(
+            name="posted_at", field_type="STRING", mode="REQUIRED"
+        ),
+        bigquery.SchemaField(
+            name="homeoffice_yes_no", field_type="STRING", mode="REQUIRED"
+        ),
+    ]
+
+    for k in keyword_columns:
+        schema.append(
+            bigquery.SchemaField(name=k, field_type="STRING", mode="REPEATED")
+        )
+
+    project_id = gcp_credentials.project
+    table_ref = f"{project_id}.final.job_results"
+
+    table = bigquery.Table(table_ref=table_ref, schema=schema)
+    client.delete_table(table, not_found_ok=True)
+    time.sleep(5)
+    client.create_table(table)
+
+    table_instance = client.get_table(table_ref)
+
+    logger.info("INFO level log message")
+    logger.info(f"Created Final Bigquery Table: '{table_ref}'")
+
+    return table_instance
 
 
 @flow
@@ -253,10 +352,10 @@ def final_bigquery_flow(
     )
 
     # Extract htidocid from Job ID
-    df_htidocid = extract_htidocid(df)
+    df_job_id_parsed = extract_features_from_job_id(df)
 
     # Deduplicate Job Results
-    df_deduplicated = deduplicate_job_results(df_htidocid)
+    df_deduplicated = deduplicate_job_results(df_job_id_parsed)
 
     # Identify Extension Type from Extension
     df_extension_type = identify_extension_type_from_extensions(
@@ -286,104 +385,91 @@ def final_bigquery_flow(
     # Construct Other Features
     df_homeoffice = construct_other_features(df[["job_id", "description"]])
 
-    # Combine Dataframes
-    df_job_results = pd.concat(
-        [
-            df_deduplicated,
-            df_keywords,
-            df_text_length,
-            df_extension_type,
-            df_posting_date,
-            df_homeoffice,
-        ],
-        axis=1,
-    )
+    # ---------------------------------------------------------------------------------
 
-    # # Encode missing values correctly
-    # df_job_results = df_job_results.replace({'-': np.nan, '[]': np.nan})
+    # Combine Dataframes
+    dfs = [
+        df_keywords,
+        df_text_length,
+        df_extension_type,
+        df_posting_date,
+        df_homeoffice,
+    ]
+    df_job_results = df_deduplicated.copy()
+    for df in dfs:
+        df_job_results = df_job_results.merge(df, on="job_id", how="inner")
 
     # Remove Duplicate Columns
     df_job_results = df_job_results.loc[
         :, ~df_job_results.columns.duplicated()
     ].copy()
 
+    # Keep only relevant columns
+    df_out = df_job_results[
+        [
+            "search_id",
+            "via",
+            "location",
+            "description_x",
+            "company_name",
+            "title",
+            "created_at_x",
+            "q",
+            "htidocid",
+            "job_title",
+            "programming_markup_languages",
+            "databases",
+            "hosting_platforms",
+            "data_orchestration_frameworks",
+            "neural_net_frameworks",
+            "nlp_frameworks",
+            "data_processing_frameworks",
+            "business_intelligence_tools",
+            "devops_tools",
+            "version_control_tools",
+            "datawarehousing",
+            "command_line_tools",
+            "text_length_in_chars",
+            "number_tokens",
+            "employment_type_x",
+            "posted_at",
+            "homeoffice_yes_no",
+        ]
+    ]
+
+    # Remove "_x" from column names
+    cleaned_column_names = [col.replace("_x", "") for col in df_out.columns]
+    df_out.columns = cleaned_column_names
+
+    # Convert to String
+    df_out["created_at"] = df_out["created_at"].astype("str")
+    df_out["posted_at"] = df_out["posted_at"].astype("str")
+
+    # # Deduplicate
+    # df_out = df_out.drop_duplicates()
+
+    # Convert String representation of list to actual list
+    config_dict = keyword_extract_config.__dict__
+    keyword_columns = list(config_dict.keys())
+    for col in keyword_columns:
+        df_out[col] = df_out[col].apply(
+            lambda x: eval(x) if isinstance(x, str) else x
+        )
+
     # Save to CSV
-    df_job_results.to_csv("data/final/job_results.csv", index=False, sep=";")
+    df_out.to_csv("data/final/job_results.csv", index=False, sep=";")
 
-    # json_records = df.to_json(orient='records')
+    # Init Bigquery Client
+    client = bigquery.Client()
 
-    # client = bigquery.Client()
+    # Create Bigquery Table
+    table_instance = create_final_bigquery_table(
+        client, gcp_credentials, keyword_columns
+    )
 
-    # job_config = bigquery.LoadJobConfig(
-    #     autodetect=True
-    # )
-
-    # project_id = gcp_credentials.project
-    # table_ref = f"{project_id}.final.job_results"
-
-    # job = client.load_table_from_json(json_records, table_ref, job_config=job_config)
-
-    # job.result()
-
-    # schema = [
-    #     bigquery.SchemaField(name="search_id", field_type="STRING", mode="REQUIRED")
-    # ]
-
-    # project_id = gcp_credentials.project
-    # table_ref = f"{project_id}.final.job_results"
-
-    # job_config = bigquery.LoadJobConfig(
-    #     schema=schema
-    # )
-
-    # df = pd.DataFrame(df["search_id"])
-    # job = client.load_table_from_dataframe(df, table_ref, job_config=job_config)
-
-    # schema = [
-    #     bigquery.SchemaField("search_id", type="STRING", mode="REQUIRED"),
-    #     bigquery.SchemaField("datawarehousing", type="STRING", mode="NULLABLE", default_value_expression=())]
-
-    # project_id = gcp_credentials.project
-    # table_ref = f"{project_id}.final.job_results"
-
-    # table = bigquery.Table(table_ref=table_ref,schema=schema)
-
-    # client.create_table(table)
-
-    # errors = client.insert_rows_from_dataframe(table, df_job_results[["search_id", "job_id"]])
-    # for chunk in errors:
-    #     print(f"encountered {len(chunk)} errors: {chunk}")
-
-    # # writer = pyarrow.BufferOutputStream()
-    # # pyarrow.parquet.write_table(
-    # #     pyarrow.Table.from_pandas(df_job_results),
-    # #     writer,
-    # #     use_compliant_nested_type=True
-    # # )
-    # # reader = pyarrow.BufferReader(writer.getvalue())
-
-    # # client = bigquery.Client()
-    # # parquet_options = bigquery.format_options.ParquetOptions()
-    # # parquet_options.enable_list_inference = True
-    # # job_config = bigquery.LoadJobConfig()
-    # # job_config.source_format = bigquery.SourceFormat.PARQUET
-    # # job_config.parquet_options = parquet_options
-
-    # # job = client.load_table_from_file(
-    # #     reader, "final.job_results", job_config=job_config
-    # # )
-
-    # # for col in df_job_results.columns:
-    # #     print(f"Saving column '{col}' to Bigquery")
-    # #     try:
-    # #         df = pd.DataFrame(df_job_results[col])
-    # #         df.to_gbq(f"final.job_results_{col}", project_id=gcp_credentials.project, if_exists="replace")
-    # #         print(f"Sucessfully saved column '{col}' to Bigquery")
-    # #     except Exception as e:
-    # #         print(f"Could not save column '{col}' to Bigquery: {e}")
-
-    # # # Pandas to Bigquery
-    # # df_job_results.to_gbq("final.job_results", project_id=gcp_credentials.project, if_exists="replace")
+    errors = client.insert_rows_from_dataframe(table_instance, df_out)
+    for chunk in errors:
+        print(f"encountered {len(chunk)} errors: {chunk}")
 
 
 if __name__ == "__main__":
